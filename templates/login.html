@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alpha Terminal — Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:     #f0f4ff;
+      --white:  #ffffff;
+      --navy:   #0f1923;
+      --blue:   #0066ff;
+      --blue2:  #4d94ff;
+      --blue3:  #e6eeff;
+      --teal:   #0891b2;
+      --border: #e2e8f8;
+      --muted:  #6b7a99;
+      --green:  #059669;
+      --red:    #dc2626;
+      --mono:   'IBM Plex Mono', monospace;
+      --serif:  'Instrument Serif', serif;
+      --sans:   'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: var(--bg);
+      font-family: var(--sans);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Grid background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(0,102,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,102,255,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Blue bloom */
+    body::after {
+      content: '';
+      position: fixed; z-index: 0; pointer-events: none;
+      width: 700px; height: 700px;
+      top: -200px; right: -150px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,102,255,0.08) 0%, transparent 65%);
+    }
+
+    /* ── Top bar ── */
+    nav {
+      position: relative; z-index: 2;
+      height: 52px;
+      background: var(--navy);
+      border-bottom: 3px solid var(--blue);
+      display: flex; align-items: center; padding: 0 32px;
+    }
+    .nav-logo {
+      font-family: var(--serif); font-style: italic;
+      font-size: 18px; color: #fff; letter-spacing: .02em;
+    }
+    .nav-logo em {
+      font-style: normal; font-family: var(--mono);
+      font-size: 9px; color: var(--blue2);
+      letter-spacing: .2em; margin-left: 10px; vertical-align: middle;
+    }
+
+    /* ── Main ── */
+    main {
+      position: relative; z-index: 1;
+      flex: 1; display: flex;
+      align-items: center; justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .login-wrap {
+      display: grid;
+      grid-template-columns: 360px 320px;
+      gap: 0;
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.10);
+    }
+
+    /* Left panel — brand */
+    .brand-panel {
+      background: var(--navy);
+      padding: 48px 40px;
+      display: flex; flex-direction: column; justify-content: space-between;
+      position: relative; overflow: hidden;
+    }
+    .brand-panel::before {
+      content: '';
+      position: absolute; bottom: -80px; right: -80px;
+      width: 280px; height: 280px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,102,255,0.3) 0%, transparent 65%);
+    }
+    .brand-panel::after {
+      content: '';
+      position: absolute; top: -40px; left: -40px;
+      width: 200px; height: 200px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(8,145,178,0.2) 0%, transparent 65%);
+    }
+    .brand-heading {
+      position: relative; z-index: 1;
+    }
+    .brand-tag {
+      font-family: var(--mono); font-size: 8px;
+      letter-spacing: .25em; color: var(--blue2);
+      text-transform: uppercase; margin-bottom: 16px;
+    }
+    .brand-title {
+      font-family: var(--serif); font-style: italic;
+      font-size: 36px; color: #fff; line-height: 1.15;
+      margin-bottom: 12px;
+    }
+    .brand-sub {
+      font-size: 12px; color: rgba(255,255,255,0.45);
+      line-height: 1.6;
+    }
+    .brand-stats {
+      position: relative; z-index: 1;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .bstat {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .bstat-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--blue2); flex-shrink: 0;
+    }
+    .bstat-dot.green { background: #4ade80; }
+    .bstat-dot.teal  { background: #22d3ee; }
+    .bstat-text {
+      font-family: var(--mono); font-size: 10px;
+      color: rgba(255,255,255,0.55); letter-spacing: .04em;
+    }
+    .bstat-val {
+      margin-left: auto;
+      font-family: var(--mono); font-size: 10px;
+      color: rgba(255,255,255,0.85); font-weight: 600;
+    }
+
+    /* Right panel — form */
+    .form-panel {
+      padding: 48px 36px;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    .form-head {
+      margin-bottom: 28px;
+    }
+    .form-title {
+      font-size: 20px; font-weight: 600;
+      color: var(--navy); margin-bottom: 4px;
+    }
+    .form-sub {
+      font-size: 12px; color: var(--muted);
+    }
+
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-family: var(--mono); font-size: 9px;
+      letter-spacing: .16em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      background: #f7f9ff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: var(--mono); font-size: 13px;
+      color: var(--navy); outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .field input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(0,102,255,0.10);
+      background: #fff;
+    }
+    .field input::placeholder { color: #c5cce0; }
+
+    .error-msg {
+      background: rgba(220,38,38,0.06);
+      border: 1px solid rgba(220,38,38,0.2);
+      border-radius: 8px;
+      padding: 9px 13px;
+      font-family: var(--mono); font-size: 11px;
+      color: var(--red); margin-bottom: 16px;
+    }
+
+    .btn-login {
+      width: 100%;
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px;
+      font-family: var(--mono); font-size: 12px;
+      font-weight: 600; letter-spacing: .1em;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+      margin-top: 4px;
+      position: relative; overflow: hidden;
+    }
+    .btn-login::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--blue), var(--teal));
+    }
+    .btn-login:hover { background: #1a2940; transform: translateY(-1px); }
+    .btn-login:active { transform: translateY(0); }
+
+    .demo-hint {
+      margin-top: 20px;
+      padding: 12px;
+      background: var(--blue3);
+      border-radius: 8px;
+      border: 1px solid rgba(0,102,255,0.15);
+    }
+    .demo-hint-title {
+      font-family: var(--mono); font-size: 8px;
+      letter-spacing: .15em; color: var(--blue);
+      text-transform: uppercase; margin-bottom: 6px;
+    }
+    .demo-cred {
+      display: flex; justify-content: space-between; align-items: center;
+      font-family: var(--mono); font-size: 10px;
+      color: var(--muted); margin-bottom: 2px;
+    }
+    .demo-cred span { color: var(--navy); font-weight: 500; }
+
+    /* Footer */
+    footer {
+      position: relative; z-index: 1;
+      text-align: center; padding: 16px;
+      font-family: var(--mono); font-size: 9px;
+      color: var(--muted); letter-spacing: .06em;
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Alpha Terminal <em>NSE · IT SECTOR</em></div>
+</nav>
+
+<main>
+  <div class="login-wrap">
+
+    <!-- Brand panel -->
+    <div class="brand-panel">
+      <div class="brand-heading">
+        <div class="brand-tag">MBA Finance Project</div>
+        <div class="brand-title">Institutional<br>Grade Analytics</div>
+        <div class="brand-sub">LSTM price prediction combined with GARCH volatility modelling across 10 NSE IT stocks.</div>
+      </div>
+      <div class="brand-stats">
+        <div class="bstat">
+          <div class="bstat-dot"></div>
+          <div class="bstat-text">Coverage Universe</div>
+          <div class="bstat-val">10 Stocks</div>
+        </div>
+        <div class="bstat">
+          <div class="bstat-dot green"></div>
+          <div class="bstat-text">Model Architecture</div>
+          <div class="bstat-val">LSTM + GARCH</div>
+        </div>
+        <div class="bstat">
+          <div class="bstat-dot teal"></div>
+          <div class="bstat-text">Alpha Score</div>
+          <div class="bstat-val">4-Factor</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Form panel -->
+    <div class="form-panel">
+      <div class="form-head">
+        <div class="form-title">Sign In</div>
+        <div class="form-sub">Access the Alpha Terminal dashboard</div>
+      </div>
+
+      {% if error %}
+      <div class="error-msg">⚠ {{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="/login">
+        <div class="field">
+          <label>Username</label>
+          <input type="text" name="username" placeholder="Enter username" autocomplete="off" required>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" name="password" placeholder="Enter password" required>
+        </div>
+        <button type="submit" class="btn-login">SIGN IN →</button>
+      </form>
+
+      <div class="demo-hint">
+        <div class="demo-hint-title">Demo Credentials</div>
+        <div class="demo-cred">Username: <span>demo</span></div>
+        <div class="demo-cred">Password: <span>demo123</span></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>ALPHA TERMINAL &nbsp;·&nbsp; NSE IT SECTOR ANALYTICS &nbsp;·&nbsp; MBA PROJECT</footer>
+
+</body>
+</html>

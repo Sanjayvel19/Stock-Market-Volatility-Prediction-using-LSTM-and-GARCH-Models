@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alpha Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:       #f0f4ff;
+      --surface:  #ffffff;
+      --surface2: #f7f9ff;
+      --border:   #e2e8f8;
+      --border2:  #c8d4ee;
+      --navy:     #0f1923;
+      --blue:     #0066ff;
+      --blue2:    #4d94ff;
+      --blue3:    #e6eeff;
+      --text:     #0f1923;
+      --muted:    #6b7a99;
+      --muted2:   #9ca8c0;
+      --green:    #059669;
+      --red:      #dc2626;
+      --teal:     #0891b2;
+      --mono:     'IBM Plex Mono', monospace;
+      --serif:    'Instrument Serif', serif;
+      --sans:     'Plus Jakarta Sans', sans-serif;
+    }
+
+    html, body {
+      height: 100%; overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+    }
+
+    /* Subtle grid pattern on bg */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(0,102,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,102,255,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Top-left blue bloom */
+    body::after {
+      content: '';
+      position: fixed; z-index: 0; pointer-events: none;
+      width: 600px; height: 600px;
+      top: -200px; left: -200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(0,102,255,0.07) 0%, transparent 70%);
+    }
+
+    header, .body { position: relative; z-index: 1; }
+
+    /* ── Header ── */
+    header {
+      height: 52px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 22px;
+      background: var(--navy);
+      border-bottom: 3px solid var(--blue);
+    }
+
+    .logo {
+      font-family: var(--serif); font-size: 17px; font-style: italic;
+      letter-spacing: .04em; color: #ffffff;
+    }
+    .logo em { font-style: normal; font-family: var(--mono); font-size: 9px; color: var(--blue2); letter-spacing: .2em; vertical-align: middle; margin-left: 8px; }
+
+    .hdr-r { display: flex; align-items: center; gap: 18px; }
+
+    .live {
+      display: flex; align-items: center; gap: 6px;
+      font-family: var(--mono); font-size: 9px; letter-spacing: .12em;
+      color: #4ade80;
+    }
+    .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: #4ade80;
+      box-shadow: 0 0 8px #4ade80;
+      animation: blink 2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+
+    select {
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.20);
+      color: #ffffff;
+      font-family: var(--mono); font-size: 11px;
+      padding: 5px 12px; border-radius: 6px;
+      cursor: pointer; outline: none;
+      transition: border-color .2s, background .2s;
+    }
+    select:hover, select:focus { background: rgba(255,255,255,0.18); border-color: var(--blue2); }
+    select option { background: var(--navy); color: #fff; }
+
+    /* ── Layout ── */
+    .body {
+      height: calc(100vh - 52px);
+      display: grid;
+      grid-template-columns: 252px 1fr;
+      gap: 10px; padding: 10px; overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex; flex-direction: column;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+    }
+
+    .ph {
+      flex-shrink: 0; padding: 8px 14px;
+      font-family: var(--mono); font-size: 8px; letter-spacing: .2em;
+      color: var(--muted2); text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+
+    .rank-list { flex: 1; overflow-y: auto; }
+    .rank-list::-webkit-scrollbar { width: 3px; }
+    .rank-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .rrow {
+      display: flex; align-items: center; gap: 7px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer; transition: background .12s;
+    }
+    .rrow:hover  { background: var(--blue3); }
+    .rrow.active {
+      background: #e6eeff;
+      border-left: 3px solid var(--blue);
+      padding-left: 9px;
+    }
+    .rn  { font-family: var(--mono); font-size: 9px; color: var(--muted2); width: 14px; flex-shrink: 0; }
+    .rtk { font-family: var(--mono); font-size: 11px; font-weight: 600; flex: 1; color: var(--navy); }
+    .rrt { font-family: var(--mono); font-size: 10px; width: 46px; text-align: right; }
+    .pill {
+      font-family: var(--mono); font-size: 7px; font-weight: 600;
+      letter-spacing: .05em; padding: 2px 5px; border-radius: 4px; white-space: nowrap;
+    }
+    .p-sb { background: rgba(5,150,105,.10);  color: #059669; border: 1px solid rgba(5,150,105,.25); }
+    .p-b  { background: rgba(0,102,255,.10);  color: #0066ff; border: 1px solid rgba(0,102,255,.25); }
+    .p-h  { background: rgba(107,122,153,.10); color: var(--muted); border: 1px solid var(--border); }
+    .p-s  { background: rgba(220,38,38,.08);  color: #dc2626; border: 1px solid rgba(220,38,38,.20); }
+    .rsc  { font-family: var(--mono); font-size: 10px; color: var(--blue); width: 26px; text-align: right; font-weight: 600; }
+    .pos  { color: var(--green); } .neg { color: var(--red); }
+
+    /* ── Right pane ── */
+    .right { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow: hidden; }
+
+    /* ── KPI bar ── */
+    .kpi-bar { flex-shrink: 0; display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 11px 15px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+      transition: box-shadow .2s, border-color .2s;
+      position: relative; overflow: hidden;
+    }
+    .kpi::before {
+      content: ''; position: absolute;
+      bottom: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--blue), var(--teal));
+      opacity: 0; transition: opacity .2s;
+    }
+    .kpi:hover { box-shadow: 0 4px 20px rgba(0,102,255,0.12); border-color: var(--blue2); }
+    .kpi:hover::before { opacity: 1; }
+    .kl  { font-family: var(--mono); font-size: 8px; letter-spacing: .16em; color: var(--muted2); text-transform: uppercase; margin-bottom: 5px; }
+    .kv  { font-family: var(--mono); font-size: 19px; font-weight: 600; line-height: 1; color: var(--navy); }
+    .ks  { font-size: 10px; color: var(--muted2); margin-top: 4px; font-family: var(--mono); }
+
+    /* ── Charts row ── */
+    .charts-row { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 265px; gap: 10px; }
+    .main-col { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .rcol     { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+
+    /* Panel */
+    .gpanel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px; overflow: hidden;
+      display: flex; flex-direction: column;
+      min-height: 0; flex: 1;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.04);
+    }
+    .phead {
+      flex-shrink: 0; padding: 7px 14px;
+      font-family: var(--mono); font-size: 8px; letter-spacing: .18em;
+      color: var(--muted2); text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .pbody { flex: 1; min-height: 0; }
+
+    /* ── Score breakdown ── */
+    .score-wrap { padding: 12px 15px; }
+    .score-num {
+      font-family: var(--serif); font-style: italic;
+      font-size: 44px; line-height: 1; color: var(--blue);
+    }
+    .score-lbl { font-family: var(--mono); font-size: 9px; color: var(--muted2); margin-bottom: 12px; }
+    .mrow { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+    .mrow:last-child { border: none; }
+    .mn   { font-family: var(--mono); font-size: 8px; letter-spacing: .08em; color: var(--muted2); text-transform: uppercase; width: 72px; flex-shrink: 0; }
+    .mbar { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .mfill { height: 100%; border-radius: 2px; transition: width .7s cubic-bezier(.4,0,.2,1); }
+    .mv   { font-family: var(--mono); font-size: 10px; font-weight: 600; width: 52px; text-align: right; }
+
+    /* ── Footer ── */
+    .footer {
+      flex-shrink: 0; height: 34px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: flex-end;
+      gap: 22px; padding: 0 18px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+    }
+    .fstat { font-family: var(--mono); font-size: 9px; color: var(--muted2); letter-spacing: .04em; }
+    .fstat b { color: var(--navy); font-weight: 600; }
+
+    /* Divider line in sidebar */
+    .sdivider { height: 1px; background: var(--border); margin: 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Alpha Terminal <em>NSE &middot; IT SECTOR</em></div>
+  <div class="hdr-r">
+    <div class="live"><div class="dot"></div>MODEL ACTIVE</div>
+    <a href="/compare" style="background:rgba(255,255,255,0.10);border:1px solid rgba(255,255,255,0.22);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 14px;border-radius:6px;cursor:pointer;letter-spacing:.08em;text-decoration:none;transition:background .2s;" onmouseover="this.style.background='rgba(0,102,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.10)'">⊞ COMPARE</a>
+    <select id="stockSel" onchange="loadData()">
+      {% for stock in stocks %}<option value="{{ stock }}">{{ stock }}</option>{% endfor %}
+    </select>
+    <a href="/logout" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.55);font-family:'IBM Plex Mono',monospace;font-size:10px;padding:5px 12px;border-radius:6px;text-decoration:none;letter-spacing:.06em;transition:all .2s;" onmouseover="this.style.borderColor='rgba(255,255,255,0.5)'" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)'">⏻ {% if user %}{{ user }}{% endif %}</a>
+  </div>
+</header>
+
+<div class="body">
+
+  <div class="sidebar">
+    <div class="ph">Rankings &middot; Alpha Score</div>
+    <div class="rank-list" id="rankList"></div>
+    <div class="ph" style="border-top:1px solid var(--border);">Heatmap &middot; Return vs Score</div>
+    <div id="heatmapDiv" style="flex-shrink:0;height:218px;"></div>
+  </div>
+
+  <div class="right">
+
+    <div class="kpi-bar">
+      <div class="kpi">
+        <div class="kl">Rank</div>
+        <div class="kv" id="kRank" style="color:var(--blue)">--</div>
+        <div class="ks" id="kTotal">of --</div>
+      </div>
+      <div class="kpi">
+        <div class="kl">Current Price</div>
+        <div class="kv" id="kPrice">--</div>
+        <div class="ks" id="kTarget">--</div>
+      </div>
+      <div class="kpi">
+        <div class="kl">LSTM Return</div>
+        <div class="kv" id="kRet">--</div>
+        <div class="ks">Expected 1-day</div>
+      </div>
+      <div class="kpi">
+        <div class="kl">GARCH Vol</div>
+        <div class="kv" id="kVol" style="color:var(--teal)">--</div>
+        <div class="ks">Daily %</div>
+      </div>
+      <div class="kpi">
+        <div class="kl">Signal</div>
+        <div class="kv" id="kSig">--</div>
+        <div class="ks" id="kSharpe">--</div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+
+      <div class="main-col">
+        <div class="gpanel">
+          <div class="phead" id="candleHead">Candlestick &middot; 30-Day OHLC</div>
+          <div class="pbody" id="candleDiv"></div>
+        </div>
+        <div class="gpanel">
+          <div class="phead" id="lineHead">Actual Close vs LSTM Predicted</div>
+          <div class="pbody" id="lineDiv"></div>
+        </div>
+      </div>
+
+      <div class="rcol">
+        <div class="gpanel">
+          <div class="phead">Risk-Return &middot; All Stocks</div>
+          <div class="pbody" id="scatterDiv"></div>
+        </div>
+        <div class="gpanel" style="flex:none;">
+          <div class="phead">Alpha Score &middot; Breakdown</div>
+          <div class="score-wrap">
+            <div class="score-num" id="scoreBig">--</div>
+            <div class="score-lbl">/ 100 composite score</div>
+            <div class="mrow">
+              <div class="mn">Ret/Risk</div>
+              <div class="mbar"><div class="mfill" id="b1" style="width:0%;background:var(--blue)"></div></div>
+              <div class="mv" id="v1">--</div>
+            </div>
+            <div class="mrow">
+              <div class="mn">Momentum</div>
+              <div class="mbar"><div class="mfill" id="b2" style="width:0%;background:var(--green)"></div></div>
+              <div class="mv" id="v2">--</div>
+            </div>
+            <div class="mrow">
+              <div class="mn">Vol Penalty</div>
+              <div class="mbar"><div class="mfill" id="b3" style="width:0%;background:var(--teal)"></div></div>
+              <div class="mv" style="color:var(--teal)" id="v3">--</div>
+            </div>
+            <div class="mrow">
+              <div class="mn">Sharpe</div>
+              <div class="mbar"><div class="mfill" id="b4" style="width:0%;background:var(--blue2)"></div></div>
+              <div class="mv" style="color:var(--blue)" id="v4">--</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      <div class="fstat">Universe <b id="fTotal">--</b></div>
+      <div class="fstat">Avg Return <b id="fRet">--</b></div>
+      <div class="fstat">Avg Vol <b id="fVol">--</b></div>
+      <div class="fstat">Bullish <b id="fBull">--</b></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var CE = null, LE = null, SE = null, HE = null;
+
+/* ── ECharts theme tokens matching glassmorphism ── */
+var TOOLTIP_STYLE = {
+  backgroundColor: '#ffffff',
+  borderColor: 'rgba(0,102,255,0.25)',
+  borderWidth: 1,
+  extraCssText: 'border-radius:8px;',
+  textStyle: { color: '#0f1923', fontFamily: 'IBM Plex Mono', fontSize: 10 }
+};
+var AXIS_LABEL = { color: '#9ca3af', fontFamily: 'IBM Plex Mono', fontSize: 8 };
+var SPLIT_LINE = { lineStyle: { color: 'rgba(15,25,35,0.07)', type: 'dashed' } };
+var AXIS_LINE  = { lineStyle: { color: 'rgba(15,25,35,0.10)' } };
+
+function sigClass(s) {
+  if (s === 'STRONG BUY') return 'p-sb';
+  if (s === 'BUY')        return 'p-b';
+  if (s === 'SELL' || s === 'WEAK SELL') return 'p-s';
+  return 'p-h';
+}
+function col(v)     { return v > 0 ? 'pos' : v < 0 ? 'neg' : ''; }
+function pct(v)     { return (v > 0 ? '+' : '') + v + '%'; }
+function setBar(id, p) { document.getElementById(id).style.width = Math.max(0, Math.min(100, p)) + '%'; }
+function setText(id, v) { document.getElementById(id).textContent = v; }
+
+function initChart(divId, existing) {
+  if (existing) { existing.dispose(); }
+  return echarts.init(document.getElementById(divId), null, { renderer: 'canvas' });
+}
+
+function showError(msg) {
+  document.body.innerHTML = '<div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#f0f4ff;font-family:IBM Plex Mono,monospace;">'
+    + '<div style="text-align:center;padding:40px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:16px;backdrop-filter:blur(20px);">'
+    + '<div style="font-size:10px;letter-spacing:.2em;color:rgba(180,200,240,0.45);margin-bottom:12px;">ALPHA TERMINAL</div>'
+    + '<div style="color:#f43f5e;font-size:13px;">' + msg + '</div>'
+    + '<div style="color:rgba(180,200,240,0.45);font-size:10px;margin-top:8px;">Check the Flask console for details.</div>'
+    + '</div></div>';
+}
+
+async function loadData() {
+  var ticker = document.getElementById('stockSel').value;
+  var data;
+  try {
+    var r = await fetch('/api/dashboard_data?stock=' + ticker);
+    if (!r.ok) { showError('API error: HTTP ' + r.status); return; }
+    data = await r.json();
+  } catch(e) {
+    showError('Could not connect to Flask server. Is it running?');
+    return;
+  }
+
+  var sel  = data.selected;
+  var ms   = data.market_stats;
+  var ohlc = data.ohlc;
+
+  /* ── KPIs ── */
+  setText('kRank',  '#' + sel.Rank);
+  setText('kTotal', 'of ' + ms.total);
+  setText('kPrice', '\u20b9' + sel.Price.toLocaleString('en-IN'));
+  setText('kTarget','Target \u20b9' + sel.Target.toLocaleString('en-IN'));
+  var retEl = document.getElementById('kRet');
+  retEl.textContent = pct(sel.Ret);
+  retEl.className = 'kv ' + col(sel.Ret);
+  setText('kVol', sel.Vol + '%');
+  var sigEl = document.getElementById('kSig');
+  sigEl.textContent = sel.Signal;
+  sigEl.className   = 'kv pill ' + sigClass(sel.Signal);
+  setText('kSharpe','Sharpe ' + sel.Sharpe);
+
+  /* ── Score breakdown ── */
+  setText('scoreBig', sel.Score);
+  setBar('b1', Math.min(100, Math.max(0, 50 + sel.Ret * 10)));
+  setBar('b2', Math.min(100, Math.max(0, 50 + sel.Ret * 7)));
+  setBar('b3', Math.min(100, Math.max(0, 100 - sel.Vol * 12)));
+  setBar('b4', Math.min(100, Math.max(0, 50 + sel.Sharpe * 4)));
+  var v1El = document.getElementById('v1');
+  v1El.textContent = pct(sel.Ret); v1El.className = 'mv ' + col(sel.Ret);
+  var v2El = document.getElementById('v2');
+  v2El.textContent = (sel.Ret > 0 ? '+' : '') + (sel.Ret * 0.85).toFixed(2) + '%';
+  v2El.className = 'mv ' + col(sel.Ret);
+  setText('v3', sel.Vol + '%');
+  setText('v4', sel.Sharpe);
+
+  /* ── Footer ── */
+  setText('fTotal', ms.total + ' stocks');
+  setText('fRet',   (ms.avg_ret > 0 ? '+' : '') + ms.avg_ret + '%');
+  setText('fVol',   ms.avg_vol + '%');
+  setText('fBull',  ms.bullish + '/' + ms.total);
+
+  /* ── Sidebar rankings ── */
+  var html = '';
+  for (var i = 0; i < data.rankings.length; i++) {
+    var row = data.rankings[i];
+    var active = row.Stock === ticker ? 'active' : '';
+    html += '<div class="rrow ' + active + '" onclick="pickStock(\'' + row.Stock + '\')">'
+          + '<div class="rn">' + row.Rank + '</div>'
+          + '<div class="rtk">' + row.Stock.replace('.NS', '') + '</div>'
+          + '<div class="rrt ' + col(row.Ret) + '">' + pct(row.Ret) + '</div>'
+          + '<div class="pill ' + sigClass(row.Signal) + '">' + row.Signal + '</div>'
+          + '<div class="rsc">' + row.Score + '</div>'
+          + '</div>';
+  }
+  document.getElementById('rankList').innerHTML = html;
+
+  setText('candleHead', ticker.replace('.NS','') + ' \u00b7 30-Day OHLC Candlestick');
+  setText('lineHead',   ticker.replace('.NS','') + ' \u00b7 Actual Close vs LSTM Predicted');
+
+  var dates = ohlc.map(function(d) { return d.time || d.x; });
+
+  /* Next trading day */
+  var lastDate = new Date(dates[dates.length - 1]);
+  lastDate.setDate(lastDate.getDate() + 1);
+  while (lastDate.getDay() === 0 || lastDate.getDay() === 6) { lastDate.setDate(lastDate.getDate() + 1); }
+  var nextLabel = lastDate.toISOString().slice(0, 10);
+
+  /* ────────────────────────────────────────────
+     CHART 1 — Candlestick
+  ──────────────────────────────────────────── */
+  CE = initChart('candleDiv', CE);
+  CE.setOption({
+    backgroundColor: 'transparent', animation: true,
+    grid: { top: 10, right: 76, bottom: 28, left: 8, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: (function() { var pc = data.predicted_candle; return pc ? dates.concat([pc.time]) : dates; })(),
+      axisLine: AXIS_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 4, formatter: function(v) { return v.slice(5); } }),
+      splitLine: { show: false }
+    },
+    yAxis: {
+      scale: true, position: 'right', axisLine: AXIS_LINE, splitLine: SPLIT_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { formatter: function(v) { return '\u20b9' + Number(v).toLocaleString('en-IN'); } })
+    },
+    tooltip: Object.assign({}, TOOLTIP_STYLE, {
+      trigger: 'axis',
+      axisPointer: { type: 'cross', crossStyle: { color: 'rgba(255,255,255,0.15)' } },
+      formatter: function(params) {
+        var p = params[0]; if (!p) return '';
+        var d = p.data;
+        return '<b>' + p.name + '</b><br/>O: \u20b9' + Number(d[1]).toLocaleString('en-IN')
+          + '<br/>H: \u20b9' + Number(d[4]).toLocaleString('en-IN')
+          + '<br/>L: \u20b9' + Number(d[3]).toLocaleString('en-IN')
+          + '<br/>C: \u20b9' + Number(d[2]).toLocaleString('en-IN');
+      }
+    }),
+    series: [
+      {
+        name: 'Historical', type: 'candlestick',
+        data: ohlc.map(function(d) { return [d.open||d.o, d.close||d.c, d.low||d.l, d.high||d.h]; }),
+        itemStyle: { color: '#059669', color0: '#dc2626', borderColor: '#059669', borderColor0: '#dc2626' }
+      },
+      {
+        name: 'Predicted', type: 'candlestick',
+        data: (function() { var pc = data.predicted_candle; return pc ? [[pc.open,pc.close,pc.low,pc.high]] : []; })(),
+        itemStyle: { color: 'rgba(0,102,255,0.15)', color0: 'rgba(0,102,255,0.15)', borderColor: '#0066ff', borderColor0: '#0066ff', borderWidth: 2 }
+      }
+    ]
+  });
+
+  /* ────────────────────────────────────────────
+     CHART 2 — Actual vs Predicted line
+  ──────────────────────────────────────────── */
+  LE = initChart('lineDiv', LE);
+
+  var realCloses   = ohlc.map(function(d) { return d.close || d.c; });
+  var allDates     = dates.concat([nextLabel]);
+  var N            = realCloses.length;
+  var actualSeries = realCloses.concat([null]);
+
+  var drift = sel.Predicted - sel.Price;
+  var predSeries = [];
+  for (var k = 0; k < N; k++) {
+    predSeries.push(parseFloat((realCloses[k] + drift * k / (N - 1)).toFixed(2)));
+  }
+  predSeries.push(parseFloat(sel.Predicted.toFixed(2)));
+
+  var isUp    = sel.Predicted >= sel.Price;
+  var predCol = isUp ? '#059669' : '#dc2626';
+  var predFill = isUp ? 'rgba(5,150,105,0.08)' : 'rgba(220,38,38,0.06)';
+
+  LE.setOption({
+    backgroundColor: 'transparent', animation: true,
+    legend: {
+      top: 4, right: 8,
+      textStyle: Object.assign({}, AXIS_LABEL, { fontSize: 8 }),
+      itemWidth: 16, itemHeight: 2,
+      data: ['Actual Close', 'LSTM Trend']
+    },
+    grid: { top: 28, right: 76, bottom: 24, left: 8, containLabel: true },
+    xAxis: {
+      type: 'category', data: allDates, axisLine: AXIS_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { interval: 5, formatter: function(v) { return v.slice(5); } }),
+      splitLine: { show: false }
+    },
+    yAxis: {
+      scale: true, position: 'right', axisLine: AXIS_LINE, splitLine: SPLIT_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { formatter: function(v) { return '\u20b9' + Number(v).toLocaleString('en-IN'); } })
+    },
+    tooltip: Object.assign({}, TOOLTIP_STYLE, {
+      trigger: 'axis',
+      formatter: function(params) {
+        var out = '<b>' + params[0].name + '</b><br/>';
+        params.forEach(function(p) {
+          if (p.value !== null && p.value !== undefined)
+            out += p.marker + p.seriesName + ': \u20b9' + Number(p.value).toLocaleString('en-IN') + '<br/>';
+        });
+        return out;
+      }
+    }),
+    series: [
+      {
+        name: 'Actual Close', type: 'line', data: actualSeries,
+        smooth: 0.25, symbol: 'none', connectNulls: false,
+        lineStyle: { color: '#0066ff', width: 2 },
+        areaStyle: { color: { type:'linear',x:0,y:0,x2:0,y2:1,
+          colorStops:[{offset:0,color:'rgba(0,102,255,0.12)'},{offset:1,color:'rgba(0,102,255,0)'}] } }
+      },
+      {
+        name: 'LSTM Trend', type: 'line', data: predSeries,
+        smooth: false, connectNulls: true,
+        symbol: function(v,p) { return p.dataIndex === predSeries.length-1 ? 'diamond':'none'; },
+        symbolSize: function(v,p) { return p.dataIndex === predSeries.length-1 ? 12:0; },
+        lineStyle: { color: predCol, width: 1.8, type: 'dashed', opacity: 0.9 },
+        itemStyle: { color: predCol },
+        areaStyle: { color: { type:'linear',x:0,y:0,x2:0,y2:1,
+          colorStops:[{offset:0,color:predFill},{offset:1,color:'rgba(0,0,0,0)'}] }, opacity: 0.6 },
+        label: {
+          show: true,
+          formatter: function(p) { return p.dataIndex !== predSeries.length-1 ? '' : '\u20b9'+Number(p.value).toLocaleString('en-IN'); },
+          position: 'top', distance: 8, color: predCol, fontFamily: 'IBM Plex Mono', fontSize: 9, fontWeight: 'bold'
+        },
+        markLine: {
+          silent: true, symbol: ['none','none'],
+          lineStyle: { color: 'rgba(0,102,255,0.4)', type: 'dotted', width: 1 },
+          label: { show: true, position: 'end', formatter: 'Now \u20b9'+Number(sel.Price).toLocaleString('en-IN'), color: '#0066ff', fontFamily: 'IBM Plex Mono', fontSize: 8 },
+          data: [{ yAxis: sel.Price }]
+        }
+      }
+    ]
+  });
+
+  /* ────────────────────────────────────────────
+     CHART 3 — Risk-Return Scatter
+  ──────────────────────────────────────────── */
+  SE = initChart('scatterDiv', SE);
+  var scatterData = [];
+
+  /* Scatter — dots + separate floating labels */
+  scatterData = data.rankings.map(function(r) {
+    var isSel = r.Stock === ticker;
+    return {
+      value: [r.Vol, r.Ret, r.Stock.replace('.NS','')],
+      symbolSize: isSel ? 16 : 11,
+      itemStyle: {
+        color:       isSel ? '#0066ff' : (r.Ret > 0 ? '#059669' : '#dc2626'),
+        opacity:     isSel ? 1 : 0.85,
+        borderColor: '#ffffff',
+        borderWidth: 2
+      }
+    };
+  });
+
+  /* Separate label-only series so dots and text never interfere */
+  var labelData = data.rankings.map(function(r) {
+    var isSel = r.Stock === ticker;
+    var name  = r.Stock.replace('.NS','');
+    /* Offset direction: spread labels above/below/sides based on return rank */
+    var positions = ['top','top','right','top','right','bottom','left','bottom','left','bottom'];
+    var idx = data.rankings.indexOf(r);
+    return {
+      value: [r.Vol, r.Ret, name],
+      symbol: 'none',
+      label: {
+        show: true,
+        formatter: function(p) { return p.data.value[2]; },
+        position: positions[idx % positions.length],
+        distance: 8,
+        color: isSel ? '#0066ff' : '#6b7a99',
+        fontFamily: 'IBM Plex Mono',
+        fontSize: isSel ? 9 : 8,
+        fontWeight: isSel ? '600' : '400',
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        padding: [2, 5, 2, 5],
+        borderRadius: 3,
+        borderWidth: 1,
+        borderColor: isSel ? 'rgba(0,102,255,0.3)' : 'rgba(0,0,0,0.06)'
+      }
+    };
+  });
+
+  SE.setOption({
+    backgroundColor: 'transparent', animation: true,
+    labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
+    grid: { top: 16, right: 76, bottom: 32, left: 8, containLabel: true },
+    xAxis: {
+      name: 'Vol %', nameLocation: 'end',
+      nameTextStyle: Object.assign({}, AXIS_LABEL, { padding: [0,0,0,4] }),
+      axisLine: AXIS_LINE, splitLine: SPLIT_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { formatter: function(v) { return Math.round(v)+'%'; } })
+    },
+    yAxis: {
+      name: 'Ret %', nameLocation: 'end',
+      nameTextStyle: Object.assign({}, AXIS_LABEL, { padding: [0,4,0,0] }),
+      position: 'right', axisLine: AXIS_LINE, splitLine: SPLIT_LINE,
+      axisLabel: Object.assign({}, AXIS_LABEL, { formatter: function(v) { return (v>0?'+':'')+v.toFixed(1)+'%'; } })
+    },
+    tooltip: Object.assign({}, TOOLTIP_STYLE, {
+      formatter: function(p) {
+        if (!p.data || !p.data.value) return '';
+        var d = p.data.value;
+        var ret = d[1];
+        var col = ret > 0 ? '#059669' : '#dc2626';
+        return '<b style="font-family:IBM Plex Mono">' + d[2] + '</b><br/>'
+          + '<span style="color:' + col + '">' + (ret>0?'+':'') + ret.toFixed(3) + '%</span> return<br/>'
+          + '<span style="color:#6b7a99">' + d[0].toFixed(2) + '%</span> vol';
+      }
+    }),
+    series: [
+      {
+        type: 'scatter', data: scatterData,
+        emphasis: { itemStyle: { opacity:1, shadowBlur:10, shadowColor:'rgba(0,102,255,0.3)' } },
+        markLine: {
+          silent: true, symbol: ['none','none'],
+          lineStyle: { color: 'rgba(220,38,38,0.18)', type: 'dashed', width: 1 },
+          label: { show: false },
+          data: [{ yAxis: 0 }]
+        }
+      },
+      {
+        type: 'scatter', data: labelData,
+        symbolSize: 0,
+        emphasis: { label: { show: true } }
+      }
+    ]
+  });
+
+  /* ────────────────────────────────────────────
+     CHART 4 — Heatmap treemap
+  ──────────────────────────────────────────── */
+  HE = initChart('heatmapDiv', HE);
+  var heatData = data.rankings.map(function(r) {
+    return {
+      name: r.Stock.replace('.NS',''),
+      value: r.Score, ret: r.Ret, sig: r.Signal, score: r.Score,
+      itemStyle: {
+        color: (function() {
+          if (r.Ret >= 3)    return '#0052cc';
+          if (r.Ret >= 1.5)  return '#0066ff';
+          if (r.Ret >= 0.5)  return '#4d94ff';
+          if (r.Ret >= 0)    return '#99bfff';
+          if (r.Ret >= -0.5) return '#ffb3b3';
+          return '#dc2626';
+        })(),
+        borderColor: r.Stock === ticker ? '#0f1923' : 'rgba(15,25,35,0.08)',
+        borderWidth: r.Stock === ticker ? 2 : 1
+      }
+    };
+  });
+
+  HE.setOption({
+    backgroundColor: 'transparent', animation: true,
+    tooltip: Object.assign({}, TOOLTIP_STYLE, {
+      formatter: function(p) {
+        var d = p.data;
+        return '<b>'+d.name+'</b><br/>Return: '+(d.ret>0?'+':'')+d.ret.toFixed(3)+'%<br/>Score: '+d.score+'/100<br/>Signal: '+d.sig;
+      }
+    }),
+    series: [{
+      type: 'treemap', data: heatData,
+      width: '100%', height: '100%',
+      top: 0, bottom: 0, left: 0, right: 0,
+      roam: false, breadcrumb: { show: false },
+      itemStyle: { gapWidth: 2, borderRadius: 4 },
+      label: { show: true, formatter: function(p) { return p.data.name+'\n'+(p.data.ret>0?'+':'')+p.data.ret.toFixed(2)+'%'; }, color: '#ffffff', fontFamily: 'IBM Plex Mono', fontSize: 8, lineHeight: 14 },
+      emphasis: { itemStyle: { shadowBlur: 12, shadowColor: 'rgba(34,211,238,0.3)' }, label: { color: '#fff', fontSize: 9 } }
+    }]
+  });
+  HE.on('click', function(params) {
+    if (params.data && params.data.name) { document.getElementById('stockSel').value = params.data.name+'.NS'; loadData(); }
+  });
+
+  setTimeout(function() {
+    if (CE) CE.resize(); if (LE) LE.resize();
+    if (SE) SE.resize(); if (HE) HE.resize();
+  }, 60);
+}
+
+function pickStock(t) { document.getElementById('stockSel').value = t; loadData(); }
+
+window.addEventListener('resize', function() {
+  if (CE) CE.resize(); if (LE) LE.resize();
+  if (SE) SE.resize(); if (HE) HE.resize();
+});
+/* ── Compare panel ── */
+function toggleCompare() {
+  var ov = document.getElementById('compareOverlay');
+  var isShown = ov.style.display === 'flex';
+  ov.style.display = isShown ? 'none' : 'flex';
+  document.getElementById('cmpBtn').style.background = isShown ? 'rgba(255,255,255,0.10)' : 'rgba(0,102,255,0.25)';
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { document.getElementById('compareOverlay').style.display = 'none'; } });
+
+async function updateCompare() {
+  var checked = Array.from(document.querySelectorAll('.cmp-check:checked')).map(function(el) { return el.value; });
+  var tbody = document.getElementById('cmpBody');
+
+  /* Style checked labels */
+  document.querySelectorAll('.cbox-lbl').forEach(function(lbl) {
+    var inp = lbl.querySelector('input');
+    lbl.style.borderColor = inp.checked ? '#0066ff' : '#e2e8f8';
+    lbl.style.background  = inp.checked ? '#e6eeff' : '#f7f9ff';
+    lbl.style.color       = inp.checked ? '#0066ff' : '#0f1923';
+  });
+
+  if (checked.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#9ca8c0;font-size:11px;">Select stocks above to compare</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '<tr><td colspan="8" style="padding:16px;text-align:center;color:#9ca8c0;font-size:11px;">Loading...</td></tr>';
+
+  try {
+    var r = await fetch('/api/compare?stocks=' + checked.join(','));
+    var rows = await r.json();
+  } catch(e) { tbody.innerHTML = '<tr><td colspan="8" style="color:#dc2626;padding:12px;">Error loading data</td></tr>'; return; }
+
+  var sigColors = { 'STRONG BUY': '#059669', 'BUY': '#0066ff', 'HOLD': '#6b7a99', 'SELL': '#dc2626', 'WEAK SELL': '#dc2626' };
+  var sigBg     = { 'STRONG BUY': 'rgba(5,150,105,.10)', 'BUY': 'rgba(0,102,255,.10)', 'HOLD': 'rgba(107,122,153,.08)', 'SELL': 'rgba(220,38,38,.08)', 'WEAK SELL': 'rgba(220,38,38,.06)' };
+
+  rows.sort(function(a,b){ return (b.Score||0) - (a.Score||0); });
+
+  tbody.innerHTML = rows.map(function(r, i) {
+    var retCol = r.Ret > 0 ? '#059669' : '#dc2626';
+    var sc = sigColors[r.Signal] || '#6b7a99';
+    var sb = sigBg[r.Signal]    || 'rgba(107,122,153,.08)';
+    var bg = i % 2 === 0 ? '#fff' : '#f7f9ff';
+    return '<tr style="background:' + bg + ';border-bottom:1px solid #f0f4ff;">'
+      + '<td style="padding:9px 10px;font-weight:600;color:#0f1923;">' + r.ShortName + '</td>'
+      + '<td style="padding:9px 10px;text-align:right;">₹' + r.Price.toLocaleString("en-IN") + '</td>'
+      + '<td style="padding:9px 10px;text-align:right;color:#0066ff;">₹' + r.Predicted.toLocaleString("en-IN") + '</td>'
+      + '<td style="padding:9px 10px;text-align:right;color:' + retCol + ';font-weight:600;">' + (r.Ret > 0 ? '+' : '') + r.Ret + '%</td>'
+      + '<td style="padding:9px 10px;text-align:right;color:#6b7a99;">' + r.Vol.toFixed(2) + '%</td>'
+      + '<td style="padding:9px 10px;text-align:right;">' + r.Sharpe + '</td>'
+      + '<td style="padding:9px 10px;text-align:right;font-weight:700;color:#0066ff;">' + (r.Score || '--') + '</td>'
+      + '<td style="padding:9px 10px;text-align:center;"><span style="background:' + sb + ';color:' + sc + ';border:1px solid ' + sc + '33;padding:2px 7px;border-radius:4px;font-size:8px;letter-spacing:.05em;">' + r.Signal + '</span></td>'
+      + '</tr>';
+  }).join('');
+}
+
+window.addEventListener('load', loadData);
+</script>
+</body>
+</html>

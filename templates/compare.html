@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compare Stocks — Alpha Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:     #f0f4ff;
+      --white:  #ffffff;
+      --navy:   #0f1923;
+      --blue:   #0066ff;
+      --blue2:  #4d94ff;
+      --blue3:  #e6eeff;
+      --teal:   #0891b2;
+      --border: #e2e8f8;
+      --muted:  #6b7a99;
+      --muted2: #9ca8c0;
+      --green:  #059669;
+      --red:    #dc2626;
+      --mono:   'IBM Plex Mono', monospace;
+      --serif:  'Instrument Serif', serif;
+      --sans:   'Plus Jakarta Sans', sans-serif;
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--navy); font-family: var(--sans); font-size: 13px; }
+
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: linear-gradient(rgba(0,102,255,0.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(0,102,255,0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    header {
+      position: relative; z-index: 2; height: 52px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 22px; background: var(--navy); border-bottom: 3px solid var(--blue);
+    }
+    .logo { font-family: var(--serif); font-style: italic; font-size: 17px; color: #fff; }
+    .logo em { font-style: normal; font-family: var(--mono); font-size: 9px; color: var(--blue2); letter-spacing: .2em; margin-left: 8px; vertical-align: middle; }
+    .hdr-r { display: flex; align-items: center; gap: 14px; }
+    .hdr-btn {
+      font-family: var(--mono); font-size: 10px; letter-spacing: .08em;
+      padding: 5px 14px; border-radius: 6px; cursor: pointer;
+      text-decoration: none; transition: all .2s;
+    }
+    .hdr-btn-ghost { background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.22); color: #fff; }
+    .hdr-btn-ghost:hover { background: rgba(255,255,255,0.20); }
+    .hdr-btn-active { background: rgba(0,102,255,0.35); border: 1px solid rgba(0,102,255,0.6); color: #fff; }
+    .user-tag { font-family: var(--mono); font-size: 10px; color: rgba(255,255,255,0.45); letter-spacing: .06em; }
+
+    /* ── Page body ── */
+    .page { position: relative; z-index: 1; padding: 16px 20px; min-height: calc(100vh - 52px); display: flex; flex-direction: column; gap: 14px; }
+
+    /* ── Stock selector bar ── */
+    .selector-bar {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; padding: 16px 20px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    }
+    .selector-title {
+      font-family: var(--mono); font-size: 8px; letter-spacing: .2em;
+      color: var(--muted2); text-transform: uppercase; margin-bottom: 12px;
+    }
+    .stock-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .spill {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 14px; border-radius: 8px;
+      border: 1px solid var(--border); background: #f7f9ff;
+      font-family: var(--mono); font-size: 11px; color: var(--navy);
+      cursor: pointer; transition: all .15s; user-select: none;
+    }
+    .spill:hover { border-color: var(--blue2); background: var(--blue3); }
+    .spill.sel   { border-color: var(--blue); background: var(--blue3); color: var(--blue); font-weight: 600; }
+    .spill.sel .spill-dot { background: var(--blue); }
+    .spill-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted2); transition: background .15s; }
+    .compare-btn {
+      margin-left: auto; align-self: flex-end;
+      display: flex; align-items: center;
+    }
+    .btn-run {
+      background: var(--navy); color: #fff; border: none;
+      border-radius: 8px; padding: 9px 22px;
+      font-family: var(--mono); font-size: 11px; font-weight: 600;
+      letter-spacing: .1em; cursor: pointer;
+      transition: background .2s; position: relative; overflow: hidden;
+    }
+    .btn-run::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--blue), var(--teal)); }
+    .btn-run:hover { background: #1a2940; }
+    .btn-run:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* ── Comparison grid ── */
+    .cmp-grid {
+      flex: 1; display: grid;
+      gap: 12px;
+    }
+    .cmp-grid.n1 { grid-template-columns: 1fr; }
+    .cmp-grid.n2 { grid-template-columns: 1fr 1fr; }
+    .cmp-grid.n3 { grid-template-columns: 1fr 1fr 1fr; }
+    .cmp-grid.n4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+    /* ── Stock card ── */
+    .scard {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+      display: flex; flex-direction: column;
+    }
+    .scard-head {
+      padding: 14px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(135deg, var(--navy) 0%, #1a2940 100%);
+      position: relative; overflow: hidden;
+    }
+    .scard-head::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--blue), var(--teal)); }
+    .scard-ticker { font-family: var(--serif); font-style: italic; font-size: 22px; color: #fff; line-height: 1; }
+    .scard-signal { display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 4px; font-family: var(--mono); font-size: 8px; font-weight: 600; letter-spacing: .06em; }
+    .sig-sb { background: rgba(5,150,105,.2);  color: #4ade80; border: 1px solid rgba(74,222,128,.3); }
+    .sig-b  { background: rgba(0,102,255,.2);  color: #93c5fd; border: 1px solid rgba(147,197,253,.3); }
+    .sig-h  { background: rgba(255,255,255,.1);color: rgba(255,255,255,.55); border: 1px solid rgba(255,255,255,.15); }
+    .sig-s  { background: rgba(220,38,38,.2);  color: #fca5a5; border: 1px solid rgba(252,165,165,.3); }
+
+    /* Metric rows */
+    .scard-body { padding: 14px 18px; display: flex; flex-direction: column; gap: 0; }
+    .metric {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .metric:last-child { border: none; }
+    .metric-lbl { font-family: var(--mono); font-size: 8px; letter-spacing: .14em; color: var(--muted2); text-transform: uppercase; }
+    .metric-val { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--navy); }
+    .metric-val.pos { color: var(--green); }
+    .metric-val.neg { color: var(--red); }
+    .metric-val.blue { color: var(--blue); }
+
+    /* Alpha score gauge */
+    .score-row { padding: 12px 0 4px; }
+    .score-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+    .score-label { font-family: var(--mono); font-size: 8px; letter-spacing: .14em; color: var(--muted2); text-transform: uppercase; }
+    .score-value { font-family: var(--serif); font-style: italic; font-size: 28px; color: var(--blue); line-height: 1; }
+    .score-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .score-fill  { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--blue), var(--teal)); transition: width .8s cubic-bezier(.4,0,.2,1); }
+
+    /* Chart area */
+
+    /* ── Summary table (bottom) ── */
+    .summary-panel {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+    }
+    .summary-head {
+      padding: 10px 18px;
+      background: #f7f9ff; border-bottom: 1px solid var(--border);
+      font-family: var(--mono); font-size: 8px; letter-spacing: .2em;
+      color: var(--muted2); text-transform: uppercase;
+    }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      padding: 10px 14px; text-align: right;
+      font-family: var(--mono); font-size: 8px; letter-spacing: .12em;
+      color: var(--muted2); text-transform: uppercase; font-weight: 500;
+      border-bottom: 2px solid var(--border);
+    }
+    thead th:first-child { text-align: left; }
+    tbody tr { border-bottom: 1px solid #f0f4ff; transition: background .1s; }
+    tbody tr:hover { background: #f7f9ff; }
+    tbody tr:last-child { border: none; }
+    tbody td { padding: 9px 14px; font-family: var(--mono); font-size: 11px; text-align: right; }
+    tbody td:first-child { text-align: left; font-weight: 600; }
+
+    /* Empty state */
+    .empty-state {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 12px;
+      padding: 60px;
+    }
+    .empty-icon { font-size: 40px; opacity: .3; }
+    .empty-text { font-family: var(--mono); font-size: 11px; color: var(--muted2); letter-spacing: .08em; }
+    .empty-sub  { font-size: 11px; color: var(--muted2); }
+
+    .pos { color: var(--green); } .neg { color: var(--red); }
+
+    /* Loading spinner */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Alpha Terminal <em>NSE · IT SECTOR</em></div>
+  <div class="hdr-r">
+    <a href="/dashboard" class="hdr-btn hdr-btn-ghost">← Dashboard</a>
+    <a href="/compare"   class="hdr-btn hdr-btn-active">⊞ Compare</a>
+    <a href="/logout"    class="hdr-btn hdr-btn-ghost" style="color:rgba(255,255,255,0.5);">⏻ {% if user %}{{ user }}{% endif %}</a>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- Selector bar -->
+  <div class="selector-bar">
+    <div class="selector-title">Select stocks to compare (up to 4)</div>
+    <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+      <div class="stock-pills" id="stockPills">
+        {% for stock in stocks %}
+        <div class="spill" data-stock="{{ stock }}" onclick="toggleStock(this)">
+          <div class="spill-dot"></div>
+          {{ stock|replace('.NS','') }}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="compare-btn">
+        <button class="btn-run" id="runBtn" onclick="runCompare()" disabled>
+          RUN COMPARISON →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results area -->
+  <div id="resultsArea" style="display:flex;flex-direction:column;gap:12px;flex:1;">
+    <div class="empty-state">
+      <div class="empty-icon">⊞</div>
+      <div class="empty-text">SELECT 2–4 STOCKS ABOVE TO BEGIN</div>
+      <div class="empty-sub">Side-by-side comparison of LSTM predictions, GARCH volatility, and Alpha Scores</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var selected = [];
+var chartInstances = {};
+
+var TOOLTIP = {
+  backgroundColor: '#ffffff',
+  borderColor: 'rgba(0,102,255,0.2)',
+  borderWidth: 1,
+  textStyle: { color: '#0f1923', fontFamily: 'IBM Plex Mono', fontSize: 10 }
+};
+var AX = { color: '#9ca8c0', fontFamily: 'IBM Plex Mono', fontSize: 8 };
+var SL = { lineStyle: { color: 'rgba(0,0,0,0.06)', type: 'dashed' } };
+var AL = { lineStyle: { color: 'rgba(0,0,0,0.08)' } };
+
+function toggleStock(el) {
+  var s = el.dataset.stock;
+  var idx = selected.indexOf(s);
+  if (idx > -1) {
+    selected.splice(idx, 1);
+    el.classList.remove('sel');
+  } else {
+    if (selected.length >= 4) {
+      /* deselect oldest */
+      var oldest = selected.shift();
+      document.querySelector('.spill[data-stock="' + oldest + '"]').classList.remove('sel');
+    }
+    selected.push(s);
+    el.classList.add('sel');
+  }
+  document.getElementById('runBtn').disabled = selected.length < 2;
+}
+
+async function runCompare() {
+  if (selected.length < 2) return;
+  var btn = document.getElementById('runBtn');
+  btn.innerHTML = '<span class="spinner"></span>LOADING...';
+  btn.disabled = true;
+
+  /* Dispose old charts */
+  Object.values(chartInstances).forEach(function(ch) { try { ch.dispose(); } catch(e){} });
+  chartInstances = {};
+
+  var r, rows;
+  try {
+    r = await fetch('/api/compare?stocks=' + selected.join(','));
+    rows = await r.json();
+  } catch(e) {
+    document.getElementById('resultsArea').innerHTML = '<div style="padding:40px;text-align:center;color:#dc2626;font-family:IBM Plex Mono,monospace;">Error fetching data</div>';
+    btn.innerHTML = 'RUN COMPARISON →'; btn.disabled = false; return;
+  }
+
+  rows.sort(function(a,b) { return (b.Score||0)-(a.Score||0); });
+
+  var sigClass = function(s) {
+    if (s==='STRONG BUY') return 'sig-sb';
+    if (s==='BUY')        return 'sig-b';
+    if (s==='SELL'||s==='WEAK SELL') return 'sig-s';
+    return 'sig-h';
+  };
+
+  var colClass = function(v) { return v>0?'pos':v<0?'neg':''; };
+  var n = rows.length;
+  var gridClass = ['','n1','n2','n3','n4'][n] || 'n4';
+
+  /* ── Build cards ── */
+  var cardsHTML = '<div class="cmp-grid ' + gridClass + '" id="cardGrid">';
+  rows.forEach(function(row, i) {
+    var retCls  = colClass(row.Ret);
+    var retSign = row.Ret > 0 ? '+' : '';
+    var priceDiff = row.Predicted - row.Price;
+    var priceDiffPct = (priceDiff / row.Price * 100).toFixed(2);
+    cardsHTML += '<div class="scard">'
+      + '<div class="scard-head">'
+      +   '<div class="scard-ticker">' + row.ShortName + '</div>'
+      +   '<div class="scard-signal ' + sigClass(row.Signal) + '">' + row.Signal + '</div>'
+      + '</div>'
+      + '<div class="scard-body">'
+      +   '<div class="metric"><div class="metric-lbl">Current Price</div><div class="metric-val">₹' + row.Price.toLocaleString('en-IN') + '</div></div>'
+      +   '<div class="metric"><div class="metric-lbl">LSTM Predicted</div><div class="metric-val blue">₹' + row.Predicted.toLocaleString('en-IN') + '</div></div>'
+      +   '<div class="metric"><div class="metric-lbl">Expected Return</div><div class="metric-val ' + retCls + '">' + retSign + row.Ret + '%</div></div>'
+      +   '<div class="metric"><div class="metric-lbl">GARCH Vol</div><div class="metric-val">' + row.Vol.toFixed(3) + '%</div></div>'
+      +   '<div class="metric"><div class="metric-lbl">Sharpe Ratio</div><div class="metric-val ' + colClass(row.Sharpe) + '">' + row.Sharpe + '</div></div>'
+      +   '<div class="score-row">'
+      +     '<div class="score-header">'
+      +       '<div class="score-label">Alpha Score</div>'
+      +       '<div class="score-value">' + (typeof row.Score === "number" ? row.Score.toFixed(1) : '--') + '</div>'
+      +     '</div>'
+      +     '<div class="score-track"><div class="score-fill" id="sf_' + i + '" style="width:0%"></div></div>'
+      +   '</div>'
+      + '</div>'
+      + '</div>';
+  });
+  cardsHTML += '</div>';
+
+  /* ── Summary table ── */
+  var tableHTML = '<div class="summary-panel"><div class="summary-head">Full Comparison Summary</div><table>'
+    + '<thead><tr><th>Stock</th><th>Price</th><th>Predicted</th><th>Return</th><th>Volatility</th><th>Sharpe</th><th>Score</th><th>Signal</th></tr></thead>'
+    + '<tbody>';
+
+  rows.forEach(function(row) {
+    var sc  = { 'STRONG BUY':'#059669','BUY':'#0066ff','HOLD':'#6b7a99','SELL':'#dc2626','WEAK SELL':'#dc2626' }[row.Signal] || '#6b7a99';
+    var sb  = { 'STRONG BUY':'rgba(5,150,105,.08)','BUY':'rgba(0,102,255,.08)','HOLD':'rgba(107,122,153,.06)','SELL':'rgba(220,38,38,.07)','WEAK SELL':'rgba(220,38,38,.05)' }[row.Signal] || 'transparent';
+    tableHTML += '<tr>'
+      + '<td>' + row.ShortName + '</td>'
+      + '<td>₹' + row.Price.toLocaleString('en-IN') + '</td>'
+      + '<td style="color:#0066ff">₹' + row.Predicted.toLocaleString('en-IN') + '</td>'
+      + '<td class="' + colClass(row.Ret) + '">' + (row.Ret>0?'+':'') + row.Ret + '%</td>'
+      + '<td>' + row.Vol.toFixed(3) + '%</td>'
+      + '<td class="' + colClass(row.Sharpe) + '">' + row.Sharpe + '</td>'
+      + '<td style="color:#0066ff;font-weight:700">' + (row.Score||'--') + '</td>'
+      + '<td style="text-align:center"><span style="background:' + sb + ';color:' + sc + ';border:1px solid ' + sc + '33;padding:2px 8px;border-radius:4px;font-size:8px;letter-spacing:.05em;">' + row.Signal + '</span></td>'
+      + '</tr>';
+  });
+
+  tableHTML += '</tbody></table></div>';
+
+  document.getElementById('resultsArea').innerHTML = cardsHTML + tableHTML;
+
+  /* Animate score bars */
+  setTimeout(function() {
+    rows.forEach(function(row, i) {
+      var el = document.getElementById('sf_' + i);
+      if (el) el.style.width = (typeof row.Score === 'number' ? row.Score : 0) + '%';
+    });
+  }, 200);
+
+  /* ── Data prep ── */
+  var names     = rows.map(function(r) { return r.ShortName; });
+  var retData   = rows.map(function(r) { return parseFloat(r.Ret.toFixed(3)); });
+  var volData   = rows.map(function(r) { return parseFloat(r.Vol.toFixed(2)); });
+  var shrpData  = rows.map(function(r) { return parseFloat(r.Sharpe.toFixed(3)); });
+  var scoreData = rows.map(function(r) { return r.Score || 0; });
+
+  var resultsArea = document.getElementById('resultsArea');
+  var summaryEl   = resultsArea.querySelector('.summary-panel');
+
+  /* helper: build a panel div with header + canvas */
+  function makePanel(id, headText, height) {
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'background:#fff;border:1px solid #e2e8f8;border-radius:12px;overflow:hidden;box-shadow:0 2px 16px rgba(0,0,0,0.06);';
+    var hd = document.createElement('div');
+    hd.style.cssText = 'padding:10px 18px;background:#f7f9ff;border-bottom:1px solid #e2e8f8;font-family:IBM Plex Mono,monospace;font-size:8px;letter-spacing:.2em;color:#9ca8c0;text-transform:uppercase;';
+    hd.textContent = headText;
+    var cv = document.createElement('div');
+    cv.id = id; cv.style.cssText = 'height:' + height + 'px;';
+    wrap.appendChild(hd); wrap.appendChild(cv);
+    resultsArea.insertBefore(wrap, summaryEl);
+    return cv;
+  }
+
+  /* ════════════════════════════════════════════
+     CHART A — Grouped Bar: Return % · Vol % · Sharpe
+  ════════════════════════════════════════════ */
+  var barCanvas = makePanel('barCanvas', 'Metric Comparison · Return % | Volatility % | Sharpe Ratio', 300);
+  var barChart  = echarts.init(barCanvas, null, { renderer: 'canvas' });
+  chartInstances['bar'] = barChart;
+
+  var barTooltip = Object.assign({}, TOOLTIP, {
+    trigger: 'axis',
+    axisPointer: { type: 'shadow' },
+    formatter: function(params) {
+      var out = '<b style="font-family:IBM Plex Mono;font-size:11px">' + params[0].axisValue + '</b><br/>';
+      params.forEach(function(p) {
+        var suffix = p.seriesName === 'Sharpe' ? '' : '%';
+        var sign   = (p.value > 0 && p.seriesName !== 'Volatility %') ? '+' : '';
+        out += p.marker + ' ' + p.seriesName + ': <b>' + sign + p.value + suffix + '</b><br/>';
+      });
+      return out;
+    }
+  });
+
+  barChart.setOption({
+    backgroundColor: 'transparent',
+    animation: true, animationDuration: 800, animationEasing: 'cubicOut',
+    legend: {
+      top: 10, right: 16,
+      textStyle: Object.assign({}, AX, { fontSize: 9 }),
+      itemWidth: 12, itemHeight: 8,
+      data: ['Return %', 'Volatility %', 'Sharpe']
+    },
+    tooltip: barTooltip,
+    grid: { top: 46, right: 16, bottom: 36, left: 12, containLabel: true },
+    xAxis: {
+      type: 'category', data: names,
+      axisLine: AL, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: Object.assign({}, AX, { fontSize: 10, fontWeight: '600', color: '#0f1923' })
+    },
+    yAxis: {
+      type: 'value', axisLine: AL, splitLine: SL,
+      axisLabel: Object.assign({}, AX, { formatter: function(v) { return v.toFixed(1); } })
+    },
+    series: [
+      {
+        name: 'Return %', type: 'bar',
+        barGap: '8%', barCategoryGap: '30%',
+        data: retData.map(function(v) {
+          return { value: v, itemStyle: {
+            color: v >= 0 ? '#0066ff' : '#dc2626',
+            borderRadius: v >= 0 ? [4,4,0,0] : [0,0,4,4]
+          }};
+        }),
+        label: {
+          show: true,
+          position: function(p) { return p.data.value >= 0 ? 'top' : 'bottom'; },
+          formatter: function(p) { return (p.value > 0 ? '+' : '') + p.value.toFixed(2) + '%'; },
+          fontFamily: 'IBM Plex Mono', fontSize: 8, color: '#6b7a99'
+        }
+      },
+      {
+        name: 'Volatility %', type: 'bar',
+        data: volData.map(function(v) {
+          return { value: v, itemStyle: { color: '#0891b2', borderRadius: [4,4,0,0], opacity: 0.75 }};
+        }),
+        label: {
+          show: true, position: 'top',
+          formatter: function(p) { return p.value.toFixed(1) + '%'; },
+          fontFamily: 'IBM Plex Mono', fontSize: 8, color: '#6b7a99'
+        }
+      },
+      {
+        name: 'Sharpe', type: 'bar',
+        data: shrpData.map(function(v) {
+          return { value: v, itemStyle: {
+            color: v >= 0 ? '#059669' : '#f43f5e',
+            borderRadius: v >= 0 ? [4,4,0,0] : [0,0,4,4], opacity: 0.85
+          }};
+        }),
+        label: {
+          show: true,
+          position: function(p) { return p.data.value >= 0 ? 'top' : 'bottom'; },
+          formatter: function(p) { return p.value.toFixed(2); },
+          fontFamily: 'IBM Plex Mono', fontSize: 8, color: '#6b7a99'
+        }
+      }
+    ]
+  });
+
+  /* ════════════════════════════════════════════
+     CHART B — Line: Alpha Score per stock
+  ════════════════════════════════════════════ */
+  var lineCanvas = makePanel('lineCanvas', 'Alpha Score · Composite Score out of 100 per Stock', 240);
+  var lineChart  = echarts.init(lineCanvas, null, { renderer: 'canvas' });
+  chartInstances['line'] = lineChart;
+
+  /* Per-stock colour so each dot/line segment is identifiable */
+  var stockColors = ['#0066ff','#059669','#dc2626','#f59e0b','#8b5cf6','#0891b2','#ec4899','#64748b','#10b981','#f97316'];
+
+  lineChart.setOption({
+    backgroundColor: 'transparent',
+    animation: true, animationDuration: 900, animationEasing: 'cubicOut',
+    tooltip: Object.assign({}, TOOLTIP, {
+      trigger: 'axis',
+      formatter: function(params) {
+        var p = params[0];
+        return '<b style="font-family:IBM Plex Mono">' + p.axisValue + '</b><br/>'
+          + p.marker + ' Alpha Score: <b>' + p.value + ' / 100</b>';
+      }
+    }),
+    grid: { top: 28, right: 24, bottom: 36, left: 12, containLabel: true },
+    xAxis: {
+      type: 'category', data: names,
+      axisLine: AL, axisTick: { show: false }, splitLine: { show: false },
+      axisLabel: Object.assign({}, AX, { fontSize: 10, fontWeight: '600', color: '#0f1923' })
+    },
+    yAxis: {
+      type: 'value', min: 0, max: 100,
+      axisLine: AL, splitLine: SL,
+      axisLabel: Object.assign({}, AX, { formatter: function(v) { return v; } }),
+      name: '/ 100', nameTextStyle: Object.assign({}, AX)
+    },
+    series: [{
+      type: 'line',
+      data: scoreData.map(function(v, i) {
+        return {
+          value: v,
+          itemStyle: { color: stockColors[i % stockColors.length], borderColor: '#fff', borderWidth: 2 },
+          lineStyle: { color: '#0066ff' }
+        };
+      }),
+      smooth: 0.35,
+      symbol: 'circle', symbolSize: 14,
+      lineStyle: { color: '#0066ff', width: 2.5 },
+      areaStyle: {
+        color: { type: 'linear', x:0, y:0, x2:0, y2:1,
+          colorStops: [
+            { offset: 0, color: 'rgba(0,102,255,0.14)' },
+            { offset: 1, color: 'rgba(0,102,255,0)' }
+          ]
+        }
+      },
+      label: {
+        show: true, position: 'top', distance: 8,
+        formatter: function(p) { return p.value + '/100'; },
+        fontFamily: 'IBM Plex Mono', fontSize: 9, fontWeight: '600',
+        color: function(p) { return stockColors[p.dataIndex % stockColors.length]; }
+      },
+      markLine: {
+        silent: true, symbol: ['none','none'],
+        lineStyle: { color: 'rgba(0,0,0,0.10)', type: 'dashed', width: 1 },
+        label: { show: true, position: 'end', formatter: 'avg', fontFamily: 'IBM Plex Mono', fontSize: 7, color: '#9ca8c0' },
+        data: [{ type: 'average' }]
+      }
+    }]
+  });
+
+  btn.innerHTML = 'RUN COMPARISON →'; btn.disabled = false;
+
+  window.addEventListener('resize', function() {
+    Object.values(chartInstances).forEach(function(ch) { try { ch.resize(); } catch(e){} });
+  });
+}
+</script>
+</body>
+</html>
