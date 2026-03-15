@@ -11,32 +11,45 @@ app.secret_key = "alpha_terminal_secret_2024"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "saved_models")
 
-def load_models():
-    """Load saved model results with pandas version compatibility patch."""
-    # Monkey-patch StringDtype to accept extra constructor args from older pickles
-    try:
-        from pandas.core.arrays.string_ import StringDtype as _SD
-        _orig_init = _SD.__init__
-        def _patched_init(self, *args, **kwargs):
-            try:
-                _orig_init(self)
-            except Exception:
-                pass
-        _SD.__init__ = _patched_init
-    except Exception:
-        pass
+# ── Hardcoded model results (fallback when pkl files cannot be loaded) ──
+_LSTM_DATA = [
+    {"Stock":"TCS.NS",        "Current_Price":3188.83, "Predicted_Price":3236.33, "Expected_Return":0.014896},
+    {"Stock":"INFY.NS",       "Current_Price":1621.60, "Predicted_Price":1651.49, "Expected_Return":0.018435},
+    {"Stock":"HCLTECH.NS",    "Current_Price":1603.58, "Predicted_Price":1655.49, "Expected_Return":0.032370},
+    {"Stock":"WIPRO.NS",      "Current_Price":257.01,  "Predicted_Price":258.87,  "Expected_Return":0.007223},
+    {"Stock":"TECHM.NS",      "Current_Price":1604.60, "Predicted_Price":1601.23, "Expected_Return":-0.002103},
+    {"Stock":"KPITTECH.NS",   "Current_Price":1159.06, "Predicted_Price":1203.32, "Expected_Return":0.038188},
+    {"Stock":"MPHASIS.NS",    "Current_Price":2795.70, "Predicted_Price":2869.19, "Expected_Return":0.026288},
+    {"Stock":"COFORGE.NS",    "Current_Price":1650.96, "Predicted_Price":1740.35, "Expected_Return":0.054149},
+    {"Stock":"PERSISTENT.NS", "Current_Price":6160.90, "Predicted_Price":6284.56, "Expected_Return":0.020071},
+    {"Stock":"OFSS.NS",       "Current_Price":7626.50, "Predicted_Price":7813.98, "Expected_Return":0.024583},
+]
+_GARCH_DATA = {
+    "TCS.NS":        [1.6550435597750561],
+    "INFY.NS":       [2.261220678005101],
+    "HCLTECH.NS":    [2.045082053839925],
+    "WIPRO.NS":      [1.8535622299544647],
+    "TECHM.NS":      [1.9790751739338948],
+    "KPITTECH.NS":   [5.236150229525223],
+    "MPHASIS.NS":    [2.7990949452600797],
+    "COFORGE.NS":    [4.944571000070411],
+    "PERSISTENT.NS": [3.839103569866602],
+    "OFSS.NS":       [3.002863362204544],
+}
 
+def load_models():
+    """Load model results — tries pkl first, falls back to embedded data."""
     try:
         lstm  = joblib.load(os.path.join(MODEL_PATH, "lstm_results.pkl"))
         garch = joblib.load(os.path.join(MODEL_PATH, "garch_results.pkl"))
         if not isinstance(lstm, pd.DataFrame):
             lstm = pd.DataFrame(lstm)
         lstm.columns = [c.strip() for c in lstm.columns]
-        print(f"Models loaded OK — {len(lstm)} stocks")
+        print(f"Models loaded from pkl — {len(lstm)} stocks")
         return lstm, garch
     except Exception as e:
-        print(f"Error loading models: {e}")
-        return pd.DataFrame(), {}
+        print(f"pkl load failed ({e}) — using embedded model data")
+        return pd.DataFrame(_LSTM_DATA), _GARCH_DATA
 
 lstm_data, garch_variances = load_models()
 
