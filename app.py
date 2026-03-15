@@ -12,12 +12,32 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "saved_models")
 
 def load_models():
+    """Load saved model results with pandas version compatibility patch."""
+    import pickle, io
+
+    class CompatUnpickler(pickle.Unpickler):
+        """Patch pandas StringDtype constructor incompatibility between versions."""
+        def find_class(self, module, name):
+            if module == "pandas.core.arrays.string_" and name == "StringDtype":
+                import pandas as pd
+                # Return a callable that ignores extra args
+                class _StrDtype:
+                    def __new__(cls, *a, **kw):
+                        return pd.StringDtype()
+                return _StrDtype
+            return super().find_class(module, name)
+
+    def compat_load(path):
+        with open(path, "rb") as f:
+            return CompatUnpickler(f).load()
+
     try:
-        lstm = joblib.load(os.path.join(MODEL_PATH, "lstm_results.pkl"))
-        garch = joblib.load(os.path.join(MODEL_PATH, "garch_results.pkl"))
+        lstm  = compat_load(os.path.join(MODEL_PATH, "lstm_results.pkl"))
+        garch = compat_load(os.path.join(MODEL_PATH, "garch_results.pkl"))
         if not isinstance(lstm, pd.DataFrame):
             lstm = pd.DataFrame(lstm)
         lstm.columns = [c.strip() for c in lstm.columns]
+        print(f"Models loaded OK — {len(lstm)} stocks")
         return lstm, garch
     except Exception as e:
         print(f"Error loading models: {e}")
